@@ -1,0 +1,43 @@
+# Ignorar ambiente virtual
+venv/
+.env/
+
+# Ignorar arquivos Python compilados
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignorar arquivos de configuração do VSCode
+.vscode/
+
+# Ignorar arquivos de configuração de IDEs
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Ignorar arquivos temporários e de sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar logs
+*.log
+
+# Ignorar banco de dados SQLite local (se usar)
+*.sqlite3
+
+# Ignorar pastas de testes temporários
+tests/__pycache__/
+test/__pycache__/
+
+# Ignorar arquivos de exportação (ex: CSVs, relatórios temporários)
+*.csv
+*.xls
+*.xlsx
+
+# Ignorar configs de docker (se não for usar)
+docker-compose.override.yml
+
+# Ignorar pacotes de distribuição (se for empacotar o projeto)
+build/
+dist/
+*.egg-info/
