@@ -93,6 +93,31 @@ class SystemInfoCli:
         }
         return cpu_info
     
+    def get_memory_info(self):
+        """Obtém informações da memória"""
+        svmem = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        memory_info = {
+            "total": self._get_size(svmem.total),
+            "available": self._get_size(svmem.available),
+            "used": self._get_size(svmem.used),
+            "percentage":f"{svmem.percent}%",
+            "swap_total": self._get_size(swap.total),
+            "swap_free": self._get_size(swap.free),
+            "swap_used": self._get_size(swap.used),
+            "swap_percentage": f"{swap.percent}%"
+        }
+        return memory_info
+
+    def _get_size(self, bytes_value, suffix = "B"):
+        """Converte bytes para um formato legível por humanos"""
+        factor = 1024
+        for unit in ["", "K", "M", "G", "T", "P"]:
+            if bytes_value < factor:
+                return f"{bytes_value:.2f}{unit}{suffix}"
+            bytes_value /= factor
+        return f"{bytes_value:.2f}Y{suffix}"
+
     def display_json(self, info):
         """Exibe as informações em formato JSON"""
         print(json.dumps(info, indent=4))
