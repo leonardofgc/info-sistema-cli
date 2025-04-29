@@ -109,6 +109,44 @@ class SystemInfoCli:
         }
         return memory_info
 
+    def get_disk_info(self):
+        """Obtém informações de disco"""
+        disk_info = {}
+        partitions = psutil.disk_partitions()
+
+        for i, partition in enumerate(partitions):
+            try:
+                partition_usage = psutil.disk_usage(partition.mountpoint)
+                disk_info[f"partition_{i}"] = {
+                    "device" : partition.device,
+                    "mountpoint":partition.mountpoint,
+                    "file_system_type":partition.fstype,
+                    "total_size": self._get_size(partition_usage.total),
+                    "used":self._get_size(partition_usage.used),
+                    "free":self._get_size(partition_usage.free),
+                    "percentage": f"{partition_usage.percent}%"
+                }
+            except PermissionError:
+                disk_info[f"partition_{i}"] = {
+                    "device":partition.device,
+                    "mountpoint":partition.mountpoint,
+                    "file_system_type":partition.fstype,
+                    "access":"Sem permissão para ler"
+                }
+            # Adicionar informações de IO do disco
+            disk_io = psutil.disk_io_counters()
+            try:
+                if disk_io:
+                    disk_io["disk_io"] = {
+                        "read_since_boot":self._get_size(disk_io.read_bytes),
+                        "written_since_boot":self._get_size(disk_io.write_bytes)
+                    }
+            except(AttributeError, TypeError) as e:
+                disk_info["disk_info"] ={
+                    "erro": f"Não foi possível obter estatísticas de I/O: {str(e)}"
+                }
+            return disk_io
+
     def _get_size(self, bytes_value, suffix = "B"):
         """Converte bytes para um formato legível por humanos"""
         factor = 1024
