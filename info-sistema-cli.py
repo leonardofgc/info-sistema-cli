@@ -147,6 +147,41 @@ class SystemInfoCli:
                 }
             return disk_io
 
+    def get_network_info(self):
+        """Obtém informações de rede"""
+        
+        network_info = {
+            "interfaces":{}
+        }
+        
+        # Obter endereços IP
+        if_addrs = psutil.net_if_addrs()
+        for interface_name, interface_address in if_addrs.items():
+            network_info["interfaces"][interface_name] = []
+            for address in interface_address:
+                if address.family == socket.AF_INET: # IPv4
+                    network_info["interfaces"][interface_name].append({
+                        "ip": address.address,
+                        "netmask": address.netmask if address.netmask else '-',
+                        "broadcast": address.broadcast if address.broadcast else '-'
+                    })
+                elif address.family == socket.AF_INET6: #IPv6
+                    network_info["interfaces"][interface_name].append({
+                        "ip": address.address if address.address else '-',
+                        "netmask": address.netmask if address.address else '-'
+                    })
+        # Obter estatísticas de uso da rede
+        net_io = psutil.net_io_counters()
+        network_info["io_status"] = {
+            "bytes_sent":self._get_size(net_io.bytes_sent),
+            "bytes_received":self._get_size(net_io.bytes_recv),
+            "packets_sent": net_io.packets_sent,
+            "packets_received":net_io.packets_recv
+        }
+
+        return network_info
+
+
     def _get_size(self, bytes_value, suffix = "B"):
         """Converte bytes para um formato legível por humanos"""
         factor = 1024
@@ -159,6 +194,7 @@ class SystemInfoCli:
     def display_json(self, info):
         """Exibe as informações em formato JSON"""
         print(json.dumps(info, indent=4))
+
     
 if __name__ == "__main__":
     try:
