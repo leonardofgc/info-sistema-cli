@@ -111,41 +111,45 @@ class SystemInfoCli:
 
     def get_disk_info(self):
         """Obtém informações de disco"""
-        disk_info = {}
-        partitions = psutil.disk_partitions()
+        try:
+            disk_info = {}
+            partitions = psutil.disk_partitions()
 
-        for i, partition in enumerate(partitions):
-            try:
-                partition_usage = psutil.disk_usage(partition.mountpoint)
-                disk_info[f"partition_{i}"] = {
-                    "device" : partition.device,
-                    "mountpoint":partition.mountpoint,
-                    "file_system_type":partition.fstype,
-                    "total_size": self._get_size(partition_usage.total),
-                    "used":self._get_size(partition_usage.used),
-                    "free":self._get_size(partition_usage.free),
-                    "percentage": f"{partition_usage.percent}%"
-                }
-            except PermissionError:
-                disk_info[f"partition_{i}"] = {
-                    "device":partition.device,
-                    "mountpoint":partition.mountpoint,
-                    "file_system_type":partition.fstype,
-                    "access":"Sem permissão para ler"
-                }
-            # Adicionar informações de IO do disco
-            disk_io = psutil.disk_io_counters()
-            try:
-                if disk_io:
-                    disk_io["disk_io"] = {
-                        "read_since_boot":self._get_size(disk_io.read_bytes),
-                        "written_since_boot":self._get_size(disk_io.write_bytes)
+            for i, partition in enumerate(partitions):
+                try:
+                    partition_usage = psutil.disk_usage(partition.mountpoint)
+                    disk_info[f"partition_{i}"] = {
+                        "device" : partition.device,
+                        "mountpoint":partition.mountpoint,
+                        "file_system_type":partition.fstype,
+                        "total_size": self._get_size(partition_usage.total),
+                        "used":self._get_size(partition_usage.used),
+                        "free":self._get_size(partition_usage.free),
+                        "percentage": f"{partition_usage.percent}%"
                     }
-            except(AttributeError, TypeError) as e:
-                disk_info["disk_info"] ={
-                    "erro": f"Não foi possível obter estatísticas de I/O: {str(e)}"
-                }
-            return disk_io
+                except PermissionError:
+                    disk_info[f"partition_{i}"] = {
+                        "device":partition.device,
+                        "mountpoint":partition.mountpoint,
+                        "file_system_type":partition.fstype,
+                        "access":"Sem permissão para ler"
+                    }
+                # Adicionar informações de IO do disco
+                try:
+                    disk_io = psutil.disk_io_counters()
+                    if disk_io:
+                        disk_io["disk_io"] = {
+                            "read_since_boot":self._get_size(disk_io.read_bytes),
+                            "written_since_boot":self._get_size(disk_io.write_bytes)
+                        }
+                except(AttributeError, TypeError) as e:
+                    disk_info["disk_io_error"] ={
+                        "erro": f"Não foi possível obter estatísticas de I/O: {str(e)}"
+                    }
+                return disk_io
+        except Exception as e:
+            # Em caso de erro completo, retornar um dicionário com a mensagem de erro
+            return {"erro" : f"Erro ao obter informações de disco: {str(e)}"}
 
     def get_network_info(self):
         """Obtém informações de rede"""
@@ -181,7 +185,6 @@ class SystemInfoCli:
 
         return network_info
 
-
     def _get_size(self, bytes_value, suffix = "B"):
         """Converte bytes para um formato legível por humanos"""
         factor = 1024
@@ -195,7 +198,65 @@ class SystemInfoCli:
         """Exibe as informações em formato JSON"""
         print(json.dumps(info, indent=4))
 
-    
+    def display_formatted(self, info):
+         """Exibe as informações formatadas"""
+         for section, data in info.items():
+            print(f"\n{'=' * 20} {section.upper()} {'=' * 20}")
+
+            if section == 'os':
+                self._display_dict_as_table(data)
+            elif section == 'cpu':
+                cpu_usage = data.pop("cpu_usage_per_core", [])
+                self._display_dict_as_tabel(data)
+                if cpu_usage:
+                    print("\nUso de CPU por núcleo")
+                    for i, usage in enumerate(cpu_usage):
+                        print(f"Core {i}: {usage}")
+            elif section == 'memory':
+                self._display_dict_as_table(data)
+            elif section == 'disk':
+                if isinstance(data, dict):
+                    io_stats = None
+                    # Separar as estatísticas de I/O
+                    if "disk_io" in data:
+                        io_stats = data["disk_io"]
+                    # Exibir informações das partições
+                    for partition_name, partition_data in data.items():
+                        if partition_name != "disk_io":
+                            print(f"\nPartição: {partition_name}")
+                            self._display_dict_as_table(partition_data)
+                    
+                    # Exibir estatísticas de I/O se disponíveis       
+                    if io_stats:
+                        print("\nEstatísticas de I/O do Disco")
+                        self._display_dict_as_table(io_stats)
+                else:
+                    # Se data não for um dicionário, exibir diretamente
+                    print("\nInformações de Disco:")
+                    self._display_dict_as_table(data)
+            elif section == 'network':
+                interfaces = data.get("interfaces", {})
+                for interface_name, addresses in interfaces.items():
+                    print(f"Interfaces: {interface_name}")
+                    for addr in addresses:
+                        self._display_dict_as_table(addr)
+                if "io_status" in data:
+                    print("\nEstatísticas de I/O de Rede:")
+                    self._display_dict_as_table(data["io_status"])
+
+    def _display_dict_as_table(self, data):
+        """Exibe um dicionário como uma tabela"""
+        if isinstance(data, dict):
+            table = [ [key, value] for key, value in data.items() ]
+            print(tabulate(table, headers=["Propriedade", "Valor"]))
+        else:
+            # Para objetos tipo namedtuple ou outros objetos
+            try:
+                # Tenta converter para dicionário se possível (funciona para namedtuples)
+                table = [ [key, getattr(data, key)] for key in dir(data) if not key.startswith('_') and not callable(getattr(data, key))]
+                print(tabulate(table, headers=["Propriedade", "Valor"]))
+            except Exception:
+                print(f"Dados:{data}")
 if __name__ == "__main__":
     try:
         cli = SystemInfoCli()
